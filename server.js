@@ -1,39 +1,29 @@
-
-
-
-
 const puppeteer = require('puppeteer');
 const admin = require('firebase-admin');
-// Convert the environm
-// Convert the environment variable back to a JSON object
+
+// Parse the Firebase credentials from environment variables
 const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-// Firebase Init
-// const serviceAccount = require('./firebaseKey.json');
+
+// Initialize Firebase Admin
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   databaseURL: "https://aekads-88e11-default-rtdb.firebaseio.com/"
 });
-// const db = admin.database();
+
 const db = admin.database();
-
-
 const PORT = process.env.PORT || 3000;
 
 async function scrapeAndPush() {
- // Directly query the row with id = 1
+  const url = `https://www.cricketmazza.com/live/2236`;
 
- 
-
- // Extract the URL from the query result
- const url = `https://www.cricketmazza.com/live/2236`;
-
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-  
-  const page = await browser.newPage();
+  let browser;
   try {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle0', timeout: 0 });
     await page.waitForSelector('li.active', { timeout: 5000 });
 
@@ -45,35 +35,23 @@ async function scrapeAndPush() {
 
       const getScores = () => {
         const teams = document.querySelectorAll('div.d-flex.justify-content-center.text-white div.p-2');
-        
-        // Extract data and remove empty entries
-        const filteredScores = Array.from(teams)
+        return Array.from(teams)
           .map(team => {
             const teamName = team.querySelector('span.score-name')?.innerText.trim() || '';
             const score = team.querySelector('h3')?.innerText.trim().split(' ')[0] || '';
             return { team: teamName, score };
           })
-          .filter(item => item.team !== '' && item.score !== ''); // Remove empty entries
-      
-        // Reassign indexes to keep continuous order
-        const reorderedScores = filteredScores.map(item=> ({
-          // id: index + 1, // Ensure IDs are sequential starting from 1
-          ...item
-        }));
-      
-        return reorderedScores;
+          .filter(item => item.team && item.score);
       };
-      
 
       const getBatters = () => {
-        const rows = document.querySelectorAll('.live-batsman:nth-of-type(1)  tbody tr');
+        const rows = document.querySelectorAll('.live-batsman:nth-of-type(1) tbody tr');
         return Array.from(rows).map(row => {
           const cols = row.querySelectorAll('td');
           if (cols.length < 6) return null;
           const playerNameRaw = cols[0].innerText.trim();
           const isStriker = playerNameRaw.includes('*') ? '1' : '0';
-          const name = playerNameRaw.replace(/[\.]/g, '').trim();
-
+          const name = playerNameRaw.replace(/[.]/g, '').trim();
           return {
             name,
             runs: cols[1].innerText.trim(),
@@ -83,7 +61,7 @@ async function scrapeAndPush() {
             strikeRate: cols[5].innerText.trim(),
             isStriker
           };
-        }).filter(item => item !== null);
+        }).filter(Boolean);
       };
 
       const getBowlers = () => {
@@ -91,7 +69,6 @@ async function scrapeAndPush() {
         return Array.from(rows).map(row => {
           const cols = row.querySelectorAll('td');
           if (cols.length < 6) return null;
-
           return {
             name: cols[0].innerText.trim(),
             overs: cols[1].innerText.trim(),
@@ -100,13 +77,13 @@ async function scrapeAndPush() {
             wickets: cols[4].innerText.trim(),
             economy: cols[5].innerText.trim()
           };
-        }).filter(item => item !== null);
+        }).filter(Boolean);
       };
 
       const getLastOver = () => {
         const overElement = document.querySelector('.live-batsman-ball.ball-run ul');
         return overElement ? overElement.innerText.replace(/\s+/g, ' ').trim() : '';
-    };
+      };
 
       return {
         matchTitle: getText('li.active'),
@@ -121,13 +98,19 @@ async function scrapeAndPush() {
 
     const ref = db.ref('Livematch/nmpl_2025_26_26th_match');
     await ref.set(data);
+
+    console.log('✅ Data scraped and pushed at', new Date().toISOString());
   } catch (error) {
     console.error('❌ Scraping Error:', error.message);
   } finally {
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
   }
 }
 
-// Run scraper every 10 seconds
+// First run
 scrapeAndPush();
+
+// Then run every 10 seconds
 setInterval(scrapeAndPush, 10000);
