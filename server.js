@@ -5,8 +5,7 @@ const axios = require("axios"); // ✅ Import axios
 
 
 // Middleware
-app.set('view engine', 'ejs');
-app.use(express.static('public'));
+
 app.use(bodyParser.urlencoded({ extended: true }));
 
 
