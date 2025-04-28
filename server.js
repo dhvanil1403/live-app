@@ -1,7 +1,3 @@
-const app = express();
-const path = require('path');
-const axios = require("axios"); // ✅ Import axios
-
 
 
 // Middleware
@@ -24,9 +20,7 @@ admin.initializeApp({
 });
 // const db = admin.database();
 const db = admin.database();
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-app.use(express.static('public')); // Optional static folder for CSS/JS
+
 
 const PORT = process.env.PORT || 3000;
 
