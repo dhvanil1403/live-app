@@ -1,10 +1,5 @@
 
 
-// Middleware
-
-app.use(bodyParser.urlencoded({ extended: true }));
-
-
 
 
 const puppeteer = require('puppeteer');
